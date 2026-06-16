@@ -20,6 +20,7 @@ alter table public.listings
   add column if not exists price_terms  text,            -- "plus label · 10% over", "shipped"
   add column if not exists gemstones    jsonb;           -- [{type,carat,ctw,each,color,clarity,shape,count}]
 
+alter table public.listings drop constraint if exists listings_weight_unit_check;
 alter table public.listings
   add constraint listings_weight_unit_check
   check (weight_unit is null or weight_unit in ('g', 'dwt')) not valid;
