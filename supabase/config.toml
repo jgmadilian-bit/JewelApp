@@ -1,0 +1,13 @@
+# Supabase CLI config. Run `supabase link --project-ref <your-ref>` to connect
+# this folder to your hosted project, then:
+#   supabase db push                      # applies migrations/*.sql
+#   supabase functions deploy parse-certificate
+project_id = "jewelapp"
+
+[functions.parse-certificate]
+# Requires a valid user JWT (the app is always signed in when it calls this).
+verify_jwt = true
+
+[functions.notify-new-listing]
+# Invoked by a Database Webhook, not a user; auth via the x-webhook-secret header.
+verify_jwt = false
