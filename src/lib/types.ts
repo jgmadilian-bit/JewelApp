@@ -4,7 +4,12 @@
 export type GroupType = 'public' | 'private';
 export type MemberRole = 'admin' | 'member';
 export type MemberStatus = 'active' | 'pending' | 'banned';
-export type ListingStatus = 'available' | 'claimed' | 'withdrawn';
+export type ListingStatus =
+  | 'available'
+  | 'out_for_look'
+  | 'claimed'
+  | 'sold_elsewhere'
+  | 'withdrawn';
 
 export interface Profile {
   id: string;
@@ -105,6 +110,7 @@ export interface Listing extends StoneDetails {
   price: number | null;
   currency: string;
   photos: string[];
+  videos: string[];
   certificate_url: string | null;
   extra: Record<string, unknown> | null;
   created_at: string;

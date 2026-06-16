@@ -66,5 +66,8 @@ client-side or split it across statements.
 
 ## Not built yet
 
-Admin dashboard (members/approvals/bans/invites/moderation/analytics) and public
-group discovery. Schema + admin RLS already support them.
+The **admin dashboard** (members list, approve/remove/ban, view reports,
+moderation, analytics) and **public group discovery**. Schema + admin RLS
+already support them — invites (`group_invites`, one-time), reports
+(`reports`), and member roles/status all exist; the admin *screens* are the
+remaining work.

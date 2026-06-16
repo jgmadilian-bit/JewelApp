@@ -2,6 +2,7 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   Share,
@@ -13,7 +14,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ListingCard } from '@/src/components/ListingCard';
 import { Button, EmptyState } from '@/src/components/ui';
-import { getGroup, getListing, getListings } from '@/src/lib/api';
+import { createInvite, getGroup, getListing, getListings } from '@/src/lib/api';
+import { useAuth } from '@/src/lib/auth';
 import { subscribeGroupListings } from '@/src/lib/realtime';
 import type { Group, Listing } from '@/src/lib/types';
 import { colors, font, spacing } from '@/src/theme';
@@ -22,6 +24,7 @@ export default function GroupFeed() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { userId } = useAuth();
   const [group, setGroup] = useState<Group | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,7 +35,7 @@ export default function GroupFeed() {
 
   const load = useCallback(async () => {
     try {
-      const [g, items] = await Promise.all([getGroup(groupId), getListings(groupId)]);
+      const [g, items] = await Promise.all([getGroup(groupId, userId ?? undefined), getListings(groupId)]);
       setGroup(g);
       setListings(items);
     } catch (err) {
@@ -40,7 +43,7 @@ export default function GroupFeed() {
     } finally {
       setLoading(false);
     }
-  }, [groupId]);
+  }, [groupId, userId]);
 
   // Refresh whenever the screen regains focus (e.g. after posting a listing).
   useFocusEffect(
@@ -64,8 +67,8 @@ export default function GroupFeed() {
         setListings((prev) =>
           prev
             .map((l) => (l.id === row.id ? { ...l, ...row } : l))
-            // Drop listings that get withdrawn.
-            .filter((l) => l.status !== 'withdrawn'),
+            // Drop listings that leave the feed.
+            .filter((l) => l.status !== 'withdrawn' && l.status !== 'sold_elsewhere'),
         );
       },
     });
@@ -75,19 +78,28 @@ export default function GroupFeed() {
     };
   }, [groupId]);
 
+  // Each tap mints a fresh single-use code so it can't be passed around.
   const invite = async () => {
-    if (!group?.invite_code) return;
-    await Share.share({
-      message: `Join my JewelApp group "${group.name}" — invite code: ${group.invite_code}`,
-    });
+    try {
+      const code = await createInvite(groupId);
+      await Share.share({
+        message:
+          `Join my JewelApp group "${group?.name}" with this single-use invite code: ${code}\n\n` +
+          'It works once, for one person.',
+      });
+    } catch (err) {
+      Alert.alert('Could not create invite', err instanceof Error ? err.message : 'Try again.');
+    }
   };
+
+  const isAdmin = group?.my_role === 'admin';
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Stack.Screen
         options={{
           title: group?.name ?? 'Feed',
-          headerRight: group?.invite_code
+          headerRight: isAdmin
             ? () => (
                 <Pressable onPress={invite} hitSlop={10}>
                   <Text style={styles.headerLink}>Invite</Text>

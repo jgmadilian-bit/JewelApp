@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,14 +16,29 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar, Button, Pill } from '@/src/components/ui';
-import { claimListing, getListing, getThreadByListing, withdrawListing } from '@/src/lib/api';
+import {
+  claimListing,
+  getListing,
+  getThreadByListing,
+  reportListing,
+  setListingStatus,
+} from '@/src/lib/api';
 import { useAuth } from '@/src/lib/auth';
-import { formatClaimTime, formatPrice, timeAgo } from '@/src/lib/format';
+import { formatClaimTime, formatPrice, statusMeta, timeAgo } from '@/src/lib/format';
 import { subscribeListing } from '@/src/lib/realtime';
-import type { Listing } from '@/src/lib/types';
+import type { Listing, ListingStatus } from '@/src/lib/types';
 import { colors, font, radius, spacing } from '@/src/theme';
 
 const { width } = Dimensions.get('window');
+
+function VideoItem({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = false;
+  });
+  return (
+    <VideoView player={player} style={{ width, height: width }} contentFit="cover" nativeControls />
+  );
+}
 
 export default function ListingDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -70,8 +86,8 @@ export default function ListingDetail() {
         Alert.alert(
           'Just missed it',
           result.claimed_at
-            ? `This stone was claimed at ${formatClaimTime(result.claimed_at)}.`
-            : 'This stone was already claimed.',
+            ? `This item was claimed at ${formatClaimTime(result.claimed_at)}.`
+            : 'This item was already claimed.',
         );
       }
     } catch (err) {
@@ -81,22 +97,46 @@ export default function ListingDetail() {
     }
   };
 
-  const onWithdraw = () => {
-    Alert.alert('Withdraw listing?', 'It will be removed from the group feed.', [
+  const changeStatus = async (status: Exclude<ListingStatus, 'claimed'>, leave = false) => {
+    try {
+      await setListingStatus(listingId, status);
+      if (leave) router.back();
+      else setListing((prev) => (prev ? { ...prev, status } : prev));
+    } catch (err) {
+      Alert.alert('Could not update', err instanceof Error ? err.message : 'Try again.');
+    }
+  };
+
+  const manage = () => {
+    if (!listing) return;
+    const opts: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [];
+    if (listing.status === 'out_for_look') {
+      opts.push({ text: 'Back to available', onPress: () => void changeStatus('available') });
+    } else {
+      opts.push({ text: 'Out for look (put on hold)', onPress: () => void changeStatus('out_for_look') });
+    }
+    opts.push({ text: 'Mark sold elsewhere', onPress: () => void changeStatus('sold_elsewhere', true) });
+    opts.push({ text: 'Withdraw listing', style: 'destructive', onPress: () => void changeStatus('withdrawn', true) });
+    opts.push({ text: 'Cancel', style: 'cancel' });
+    Alert.alert('Manage listing', 'Update the status of your listing.', opts);
+  };
+
+  const report = () => {
+    Alert.alert('Report listing', 'Why are you reporting this?', [
+      { text: 'Misleading', onPress: () => void submitReport('misleading') },
+      { text: 'Prohibited item', onPress: () => void submitReport('prohibited') },
+      { text: 'Spam', onPress: () => void submitReport('spam') },
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Withdraw',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await withdrawListing(listingId);
-            router.back();
-          } catch (err) {
-            Alert.alert('Could not withdraw', err instanceof Error ? err.message : 'Try again.');
-          }
-        },
-      },
     ]);
+  };
+
+  const submitReport = async (reason: string) => {
+    try {
+      await reportListing(listingId, reason);
+      Alert.alert('Reported', 'Thanks — the group admins will review it.');
+    } catch (err) {
+      Alert.alert('Could not report', err instanceof Error ? err.message : 'Try again.');
+    }
   };
 
   const openChat = async () => {
@@ -123,6 +163,11 @@ export default function ListingDetail() {
   const isSeller = listing.seller_id === userId;
   const isClaimer = listing.claimed_by === userId;
   const available = listing.status === 'available';
+  const status = statusMeta(listing.status);
+  const media: { type: 'image' | 'video'; uri: string }[] = [
+    ...listing.photos.map((uri) => ({ type: 'image' as const, uri })),
+    ...(listing.videos ?? []).map((uri) => ({ type: 'video' as const, uri })),
+  ];
   const weightValue =
     listing.gross_weight != null ? `${listing.gross_weight} ${listing.weight_unit ?? ''}`.trim() : null;
   const specs: { label: string; value: string | null }[] = [
@@ -145,15 +190,30 @@ export default function ListingDetail() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Stack.Screen options={{ title: listing.title ?? 'Listing' }} />
+      <Stack.Screen
+        options={{
+          title: listing.title ?? 'Listing',
+          headerRight: !isSeller
+            ? () => (
+                <Pressable onPress={report} hitSlop={10}>
+                  <Text style={styles.reportLink}>Report</Text>
+                </Pressable>
+              )
+            : undefined,
+        }}
+      />
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing(28) }}>
-        {/* Photos */}
-        {listing.photos.length > 0 ? (
+        {/* Media */}
+        {media.length > 0 ? (
           <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
-            {listing.photos.map((uri) => (
-              <Image key={uri} source={{ uri }} style={{ width, height: width }} contentFit="cover" />
-            ))}
+            {media.map((m) =>
+              m.type === 'image' ? (
+                <Image key={m.uri} source={{ uri: m.uri }} style={{ width, height: width }} contentFit="cover" />
+              ) : (
+                <VideoItem key={m.uri} uri={m.uri} />
+              ),
+            )}
           </ScrollView>
         ) : (
           <View style={[styles.noPhoto, { width, height: width * 0.7 }]}>
@@ -169,7 +229,7 @@ export default function ListingDetail() {
               </Text>
               <Text style={styles.time}>Posted {timeAgo(listing.created_at)}</Text>
             </View>
-            {available ? <Pill text="Live" tone="green" /> : <Pill text="Sold" tone="red" />}
+            <Pill text={status.label} tone={status.tone} />
           </View>
 
           <View>
@@ -243,14 +303,21 @@ export default function ListingDetail() {
             </View>
           </View>
 
-          {!available ? (
+          {listing.status === 'claimed' ? (
             <View style={styles.claimedBanner}>
-              <Text style={styles.claimedTitle}>
-                {isClaimer ? 'You claimed this stone' : 'Claimed'}
-              </Text>
+              <Text style={styles.claimedTitle}>{isClaimer ? 'You claimed this item' : 'Sold'}</Text>
               {listing.claimed_at ? (
                 <Text style={styles.claimedTime}>at {formatClaimTime(listing.claimed_at)}</Text>
               ) : null}
+            </View>
+          ) : listing.status === 'out_for_look' ? (
+            <View style={styles.holdBanner}>
+              <Text style={styles.holdTitle}>On hold</Text>
+              <Text style={styles.claimedTime}>A buyer is reviewing this piece.</Text>
+            </View>
+          ) : listing.status === 'sold_elsewhere' ? (
+            <View style={styles.claimedBanner}>
+              <Text style={styles.claimedTitle}>Sold elsewhere</Text>
             </View>
           ) : null}
         </View>
@@ -259,17 +326,21 @@ export default function ListingDetail() {
       {/* Action bar */}
       <View style={[styles.actionBar, { paddingBottom: insets.bottom + spacing(3) }]}>
         {isSeller ? (
-          available ? (
-            <Button title="Withdraw listing" variant="secondary" onPress={onWithdraw} />
-          ) : (
+          listing.status === 'claimed' ? (
             <Button title="Open chat with buyer" onPress={openChat} />
+          ) : listing.status === 'sold_elsewhere' || listing.status === 'withdrawn' ? (
+            <Button title="Listing closed" variant="secondary" disabled onPress={() => {}} />
+          ) : (
+            <Button title="Manage listing" variant="secondary" onPress={manage} />
           )
-        ) : available ? (
-          <Button title="Sold — claim this stone" onPress={onClaim} loading={claiming} />
-        ) : isClaimer ? (
+        ) : listing.status === 'available' ? (
+          <Button title="Sold — claim this item" onPress={onClaim} loading={claiming} />
+        ) : listing.status === 'out_for_look' ? (
+          <Button title="On hold — being reviewed" variant="secondary" disabled onPress={() => {}} />
+        ) : listing.status === 'claimed' && isClaimer ? (
           <Button title="Open chat with seller" onPress={openChat} />
         ) : (
-          <Button title="Already claimed" variant="secondary" onPress={() => {}} disabled />
+          <Button title="No longer available" variant="secondary" disabled onPress={() => {}} />
         )}
       </View>
     </View>
@@ -337,25 +408,35 @@ const styles = StyleSheet.create({
   sellerLabel: { ...font.micro, color: colors.textFaint, textTransform: 'uppercase' },
   sellerName: { ...font.bodyStrong, color: colors.text },
 
+  reportLink: { ...font.small, color: colors.textMuted },
   claimedBanner: {
-    backgroundColor: 'rgba(255,69,58,0.1)',
+    backgroundColor: 'rgba(224,89,76,0.1)',
     borderColor: colors.redDeep,
     borderWidth: 1,
     borderRadius: radius.md,
     padding: spacing(4),
     gap: spacing(1),
   },
-  claimedTitle: { ...font.bodyStrong, color: '#FFB3AD' },
+  claimedTitle: { ...font.bodyStrong, color: '#F0A79E' },
   claimedTime: { ...font.small, color: colors.textMuted },
+  holdBanner: {
+    backgroundColor: 'rgba(216,162,74,0.1)',
+    borderColor: colors.goldDeep,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing(4),
+    gap: spacing(1),
+  },
+  holdTitle: { ...font.bodyStrong, color: colors.amber },
 
   actionBar: {
+    backgroundColor: 'rgba(12,12,14,0.94)',
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
     paddingHorizontal: spacing(4),
     paddingTop: spacing(3),
-    backgroundColor: 'rgba(11,11,15,0.94)',
     borderTopColor: colors.border,
     borderTopWidth: 1,
   },

@@ -87,13 +87,14 @@ export function Pill({
   tone = 'neutral',
 }: {
   text: string;
-  tone?: 'neutral' | 'gold' | 'green' | 'red';
+  tone?: 'neutral' | 'gold' | 'green' | 'amber' | 'red';
 }) {
   const tones = {
     neutral: { bg: colors.surfaceHi, fg: colors.textMuted },
-    gold: { bg: 'rgba(212,175,55,0.16)', fg: colors.goldSoft },
-    green: { bg: 'rgba(52,199,89,0.16)', fg: colors.green },
-    red: { bg: 'rgba(255,69,58,0.16)', fg: colors.red },
+    gold: { bg: 'rgba(198,169,108,0.15)', fg: colors.goldSoft },
+    green: { bg: 'rgba(67,181,129,0.15)', fg: colors.green },
+    amber: { bg: 'rgba(216,162,74,0.15)', fg: colors.amber },
+    red: { bg: 'rgba(224,89,76,0.15)', fg: colors.red },
   } as const;
   const c = tones[tone];
   return (

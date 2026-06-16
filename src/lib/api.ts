@@ -5,6 +5,7 @@ import type {
   Group,
   GroupType,
   Listing,
+  ListingStatus,
   Message,
   Thread,
 } from '@/src/lib/types';
@@ -45,7 +46,7 @@ export async function getMyGroups(userId: string): Promise<Group[]> {
   })) as Group[];
 }
 
-export async function getGroup(groupId: string): Promise<Group | null> {
+export async function getGroup(groupId: string, userId?: string): Promise<Group | null> {
   const { data, error } = await supabase
     .from('groups')
     .select('*, members:group_members(count)')
@@ -53,9 +54,22 @@ export async function getGroup(groupId: string): Promise<Group | null> {
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
+
+  let my_role: Group['my_role'];
+  if (userId) {
+    const { data: m } = await supabase
+      .from('group_members')
+      .select('role')
+      .eq('group_id', groupId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    my_role = (m?.role as Group['my_role']) ?? undefined;
+  }
+
   return {
     ...(data as any),
     member_count: (data as any).members?.[0]?.count ?? 0,
+    my_role,
   } as Group;
 }
 
@@ -92,7 +106,7 @@ export async function getListings(groupId: string): Promise<Listing[]> {
     .from('listings')
     .select(`*, ${SELLER_EMBED}`)
     .eq('group_id', groupId)
-    .neq('status', 'withdrawn')
+    .not('status', 'in', '("withdrawn","sold_elsewhere")')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data ?? []) as unknown as Listing[];
@@ -115,6 +129,7 @@ export interface NewListingInput {
   price: number | null;
   currency: string;
   photos: string[];
+  videos: string[];
   certificate_url: string | null;
   description: string | null;
   category: string | null;
@@ -160,10 +175,35 @@ export async function claimListing(listingId: string): Promise<ClaimResult> {
 }
 
 export async function withdrawListing(listingId: string): Promise<void> {
+  await setListingStatus(listingId, 'withdrawn');
+}
+
+/** Seller-controlled status changes (everything except 'claimed', which is the RPC). */
+export async function setListingStatus(
+  listingId: string,
+  status: Exclude<ListingStatus, 'claimed'>,
+): Promise<void> {
   const { error } = await supabase
     .from('listings')
-    .update({ status: 'withdrawn' })
+    .update({ status })
     .eq('id', listingId);
+  if (error) throw error;
+}
+
+/** Admin generates a fresh single-use invite code for a group. */
+export async function createInvite(groupId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('create_invite', { p_group_id: groupId });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function reportListing(listingId: string, reason: string): Promise<void> {
+  const { error } = await supabase
+    .from('reports')
+    .upsert(
+      { listing_id: listingId, reason },
+      { onConflict: 'listing_id,reporter_id', ignoreDuplicates: false },
+    );
   if (error) throw error;
 }
 

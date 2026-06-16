@@ -45,6 +45,8 @@ cleanly on Expo SDK 54.)
    - `supabase/migrations/0004_realtime_storage.sql`
    - `supabase/migrations/0005_push.sql`
    - `supabase/migrations/0006_listing_fields.sql`
+   - `supabase/migrations/0007_status_media.sql`
+   - `supabase/migrations/0008_invites_reports.sql`
 3. **Auth settings** (Authentication → Sign In / Providers → Email):
    - Keep **Email** enabled.
    - Turn **"Confirm email" OFF.** The app uses phone-as-identity mapped to an

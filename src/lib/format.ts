@@ -44,6 +44,26 @@ export function formatClaimTime(iso: string | null): string {
   return `${time}.${ms}`;
 }
 
+export function statusMeta(status: string): {
+  label: string;
+  tone: 'green' | 'amber' | 'red' | 'neutral';
+} {
+  switch (status) {
+    case 'available':
+      return { label: 'Live', tone: 'green' };
+    case 'out_for_look':
+      return { label: 'On hold', tone: 'amber' };
+    case 'claimed':
+      return { label: 'Sold', tone: 'red' };
+    case 'sold_elsewhere':
+      return { label: 'Sold elsewhere', tone: 'neutral' };
+    case 'withdrawn':
+      return { label: 'Withdrawn', tone: 'neutral' };
+    default:
+      return { label: status, tone: 'neutral' };
+  }
+}
+
 export function initialsOf(name: string | null | undefined): string {
   if (!name) return '?';
   const parts = name.trim().split(/\s+/).slice(0, 2);

@@ -2,13 +2,14 @@ import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar, Pill } from '@/src/components/ui';
-import { formatPrice, timeAgo } from '@/src/lib/format';
+import { formatPrice, statusMeta, timeAgo } from '@/src/lib/format';
 import type { Listing } from '@/src/lib/types';
 import { colors, font, radius, spacing } from '@/src/theme';
 
 export function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => void }) {
   const photo = listing.photos?.[0];
-  const claimed = listing.status === 'claimed';
+  const hasVideo = (listing.videos?.length ?? 0) > 0;
+  const status = statusMeta(listing.status);
   const weight =
     listing.gross_weight != null ? `${listing.gross_weight}${listing.weight_unit ?? ''}` : null;
   const stone = [
@@ -32,12 +33,17 @@ export function ListingCard({ listing, onPress }: { listing: Listing; onPress: (
           <Image source={{ uri: photo }} style={styles.image} contentFit="cover" transition={150} />
         ) : (
           <View style={[styles.image, styles.noImage]}>
-            <Text style={styles.noImageGlyph}>◇</Text>
+            <Text style={styles.noImageGlyph}>{hasVideo ? '▶' : '◇'}</Text>
           </View>
         )}
         <View style={styles.badge}>
-          {claimed ? <Pill text="Sold" tone="red" /> : <Pill text="Live" tone="green" />}
+          <Pill text={status.label} tone={status.tone} />
         </View>
+        {hasVideo ? (
+          <View style={styles.videoTag}>
+            <Text style={styles.videoTagText}>▶ Video</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.body}>
@@ -79,6 +85,16 @@ const styles = StyleSheet.create({
   noImage: { alignItems: 'center', justifyContent: 'center' },
   noImageGlyph: { fontSize: 56, color: colors.goldDeep },
   badge: { position: 'absolute', top: spacing(3), left: spacing(3) },
+  videoTag: {
+    position: 'absolute',
+    bottom: spacing(3),
+    right: spacing(3),
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing(2.5),
+    paddingVertical: spacing(1),
+  },
+  videoTagText: { ...font.micro, color: '#fff' },
 
   body: { padding: spacing(4), gap: spacing(2) },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing(3) },

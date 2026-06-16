@@ -96,7 +96,7 @@ export default function NewListing() {
   const { userId } = useAuth();
 
   const [caption, setCaption] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [media, setMedia] = useState<{ uri: string; type: 'image' | 'video' }[]>([]);
   const [certUri, setCertUri] = useState<string | null>(null);
   const [certMime, setCertMime] = useState('image/jpeg');
   const [form, setForm] = useState<Form>(EMPTY);
@@ -141,21 +141,47 @@ export default function NewListing() {
     applyParsed(parseCaption(caption));
   };
 
-  const addPhotos = async () => {
+  const pushMedia = (items: { uri: string; type: 'image' | 'video' }[]) =>
+    setMedia((prev) => [...prev, ...items].slice(0, 8));
+
+  const capture = async (kind: 'photo' | 'video') => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission needed', 'Allow camera access to capture media.');
+      return;
+    }
+    const res = await ImagePicker.launchCameraAsync({
+      mediaTypes: kind === 'photo' ? ['images'] : ['videos'],
+      videoMaxDuration: 60,
+      quality: 0.7,
+    });
+    if (res.canceled || !res.assets[0]) return;
+    pushMedia([{ uri: res.assets[0].uri, type: kind === 'photo' ? 'image' : 'video' }]);
+  };
+
+  const pickFromLibrary = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Permission needed', 'Allow photo access to attach stone images.');
+      Alert.alert('Permission needed', 'Allow photo access to attach media.');
       return;
     }
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ['images', 'videos'],
       allowsMultipleSelection: true,
-      selectionLimit: 6,
+      selectionLimit: 8,
       quality: 0.7,
     });
     if (res.canceled) return;
-    setPhotos((prev) => [...prev, ...res.assets.map((a) => a.uri)].slice(0, 6));
+    pushMedia(res.assets.map((a) => ({ uri: a.uri, type: a.type === 'video' ? 'video' : 'image' })));
   };
+
+  const addMedia = () =>
+    Alert.alert('Add media', 'Photos and short videos of the piece.', [
+      { text: 'Take photo', onPress: () => void capture('photo') },
+      { text: 'Record video', onPress: () => void capture('video') },
+      { text: 'Choose from library', onPress: () => void pickFromLibrary() },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
 
   // Optional: scan a printed GIA/IGI cert (loose stones). Needs a dev build;
   // falls back to manual entry in Expo Go.
@@ -209,7 +235,7 @@ export default function NewListing() {
       Alert.alert('Add a price', 'Enter your asking price before posting.');
       return;
     }
-    if (!caption.trim() && !form.title.trim() && photos.length === 0) {
+    if (!caption.trim() && !form.title.trim() && media.length === 0) {
       Alert.alert('Add some detail', 'Paste a listing, add a title, or attach a photo.');
       return;
     }
@@ -217,8 +243,13 @@ export default function NewListing() {
     setPosting(true);
     try {
       const photoUrls: string[] = [];
-      for (const uri of photos) {
-        photoUrls.push(await uploadToBucket(uri, { userId, kind: 'photo' }));
+      const videoUrls: string[] = [];
+      for (const item of media) {
+        const url = await uploadToBucket(item.uri, {
+          userId,
+          kind: item.type === 'video' ? 'video' : 'photo',
+        });
+        (item.type === 'video' ? videoUrls : photoUrls).push(url);
       }
       let certificateUrl: string | null = null;
       if (certUri) {
@@ -232,6 +263,7 @@ export default function NewListing() {
         price: priceNum,
         currency,
         photos: photoUrls,
+        videos: videoUrls,
         certificate_url: certificateUrl,
         description: caption.trim() || null,
         category: form.category.trim() || null,
@@ -273,17 +305,29 @@ export default function NewListing() {
         contentContainerStyle={{ padding: spacing(4), paddingBottom: insets.bottom + spacing(28), gap: spacing(5) }}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Photos */}
+        {/* Photos & video */}
         <View style={{ gap: spacing(2) }}>
-          <Label>Photos</Label>
+          <Label>Photos & video</Label>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing(3) }}>
-            {photos.map((uri) => (
-              <Image key={uri} source={{ uri }} style={styles.photo} contentFit="cover" />
+            {media.map((m, i) => (
+              <Pressable
+                key={`${m.uri}-${i}`}
+                onLongPress={() => setMedia((prev) => prev.filter((_, idx) => idx !== i))}
+              >
+                {m.type === 'image' ? (
+                  <Image source={{ uri: m.uri }} style={styles.photo} contentFit="cover" />
+                ) : (
+                  <View style={[styles.photo, styles.videoThumb]}>
+                    <Text style={styles.videoThumbGlyph}>▶</Text>
+                  </View>
+                )}
+              </Pressable>
             ))}
-            <Pressable onPress={addPhotos} style={styles.addPhoto}>
+            <Pressable onPress={addMedia} style={styles.addPhoto}>
               <Text style={styles.addPhotoGlyph}>＋</Text>
             </Pressable>
           </ScrollView>
+          {media.length ? <Text style={styles.hintFaint}>Long-press to remove</Text> : null}
         </View>
 
         {/* Caption — the hero input */}
@@ -414,6 +458,9 @@ export default function NewListing() {
 
 const styles = StyleSheet.create({
   photo: { width: 84, height: 84, borderRadius: radius.md, backgroundColor: colors.surfaceAlt },
+  videoThumb: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
+  videoThumbGlyph: { color: colors.goldSoft, fontSize: 24 },
+  hintFaint: { ...font.small, color: colors.textFaint },
   addPhoto: {
     width: 84,
     height: 84,

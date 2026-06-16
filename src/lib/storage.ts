@@ -11,6 +11,8 @@ function extFor(uri: string, mime?: string): string {
   if (mime?.includes('pdf')) return 'pdf';
   if (mime?.includes('png')) return 'png';
   if (mime?.includes('heic')) return 'heic';
+  if (mime?.includes('quicktime')) return 'mov';
+  if (mime?.includes('mp4')) return 'mp4';
   return 'jpg';
 }
 
@@ -19,17 +21,19 @@ function contentTypeFor(ext: string, mime?: string): string {
   if (ext === 'pdf') return 'application/pdf';
   if (ext === 'png') return 'image/png';
   if (ext === 'heic') return 'image/heic';
+  if (ext === 'mp4') return 'video/mp4';
+  if (ext === 'mov') return 'video/quicktime';
   return 'image/jpeg';
 }
 
 /**
- * Uploads a local file (from image-picker or document-picker) to the public
- * `listing-media` bucket and returns its public URL. Uses ArrayBuffer rather
- * than Blob, which is the reliable path on React Native.
+ * Uploads a local file (from image-picker, camera, or document-picker) to the
+ * public `listing-media` bucket and returns its public URL. Uses ArrayBuffer
+ * rather than Blob, which is the reliable path on React Native.
  */
 export async function uploadToBucket(
   localUri: string,
-  opts: { userId: string; kind: 'photo' | 'cert'; mimeType?: string },
+  opts: { userId: string; kind: 'photo' | 'cert' | 'video'; mimeType?: string },
 ): Promise<string> {
   const arrayBuffer = await new File(localUri).arrayBuffer();
   const ext = extFor(localUri, opts.mimeType);
