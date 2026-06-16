@@ -32,7 +32,7 @@ npm install
 ```
 
 (An `.npmrc` with `legacy-peer-deps=true` is committed so installs resolve
-cleanly on Expo SDK 56.)
+cleanly on Expo SDK 54.)
 
 ## 3. Create the Supabase backend
 

@@ -8,10 +8,12 @@ the full architecture map.
 
 ## Stack notes — Expo HAS CHANGED
 
-This project is on **Expo SDK 56** (React 19, React Native 0.85, expo-router v6,
-TypeScript 6). Read the versioned docs at
-<https://docs.expo.dev/versions/v56.0.0/> before changing native config — APIs
-differ from older SDKs. Specifics that bit us:
+This project is on **Expo SDK 54** (React 19.1, React Native 0.81, expo-router
+v6, TypeScript 5.9). It was scaffolded on SDK 56 but pinned down to 54 so it
+runs in the public **Expo Go** app (App Store Expo Go trails the newest SDK by a
+release). Read the versioned docs at <https://docs.expo.dev/versions/v54.0.0/>
+before changing native config — APIs differ from older SDKs. Specifics that bit
+us:
 
 - `expo-file-system` uses the new object API: `new File(uri).arrayBuffer()` /
   `.base64()`. The old `readAsStringAsync` lives under `expo-file-system/legacy`.
