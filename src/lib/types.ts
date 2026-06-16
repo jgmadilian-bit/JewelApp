@@ -60,6 +60,42 @@ export interface ParsedCertificate extends StoneDetails {
   mock?: boolean;
 }
 
+export type WeightUnit = 'g' | 'dwt';
+
+/** One gemstone (or group of identical stones) on a piece. */
+export interface Gemstone {
+  type: string | null; // Diamond, Ruby, Sapphire, Amethyst, ...
+  carat: number | null;
+  ctw?: boolean; // carat is total weight across the group
+  each?: boolean; // carat is per-stone
+  color: string | null;
+  clarity: string | null;
+  shape: string | null;
+  count?: number | null;
+}
+
+/** Generalized item attributes shared by listings and the caption parser. */
+export interface ItemDetails extends StoneDetails {
+  category: string | null;
+  metal: string | null;
+  gross_weight: number | null;
+  weight_unit: WeightUnit | null;
+  ring_size: string | null;
+  item_length: string | null;
+  condition: string | null;
+  era: string | null;
+  total_carat: number | null;
+  price_terms: string | null;
+  gemstones: Gemstone[];
+}
+
+/** Structured result of parsing a free-text listing caption. */
+export interface ParsedListing extends ItemDetails {
+  title: string;
+  price: number | null;
+  description: string;
+}
+
 export interface Listing extends StoneDetails {
   id: string;
   group_id: string;
@@ -74,6 +110,19 @@ export interface Listing extends StoneDetails {
   created_at: string;
   claimed_at: string | null;
   claimed_by: string | null;
+  // Generalized fields (0006):
+  description: string | null;
+  category: string | null;
+  metal: string | null;
+  gross_weight: number | null;
+  weight_unit: string | null;
+  ring_size: string | null;
+  item_length: string | null;
+  condition: string | null;
+  era: string | null;
+  total_carat: number | null;
+  price_terms: string | null;
+  gemstones: Gemstone[] | null;
   // Hydrated via join:
   seller?: Profile | null;
 }

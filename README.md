@@ -44,6 +44,7 @@ cleanly on Expo SDK 56.)
    - `supabase/migrations/0003_rls.sql`
    - `supabase/migrations/0004_realtime_storage.sql`
    - `supabase/migrations/0005_push.sql`
+   - `supabase/migrations/0006_listing_fields.sql`
 3. **Auth settings** (Authentication → Sign In / Providers → Email):
    - Keep **Email** enabled.
    - Turn **"Confirm email" OFF.** The app uses phone-as-identity mapped to an
@@ -67,18 +68,31 @@ EXPO_PUBLIC_SUPABASE_URL=https://<your-ref>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon public key>
 ```
 
-## 5. Deploy the OCR edge function _(optional but recommended)_
+## 5. Turning posts into structured listings
 
-The create-listing flow calls a `parse-certificate` edge function. **Without
-it deployed, certificate scanning returns realistic mock data** so the flow
-still works — fields just need manual edits.
+Dealers post a photo plus a typed caption (e.g. *"18K, Mid-century bracelet,
+60.6 dwts, Ruby Diamonds … 1 ct. White VS-SI diamonds, 10% over, $10,800 plus
+label"*). The create flow is **caption-first**: paste that text and
+`src/lib/captionParser.ts` structures it into metal, weight (dwt/grams), item
+type, gemstones, sizes, era, condition, price and price terms — **free,
+instant, offline, and works in plain Expo Go** (it's pure string parsing). Every
+field stays editable.
 
-```bash
-supabase link --project-ref <your-ref>
-supabase functions deploy parse-certificate
-# For real OCR (vision model) instead of mock data:
-supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
-```
+### Certificate OCR (optional, for loose certified stones)
+
+For the subset that carry a printed GIA/IGI report, a "Scan certificate" button
+runs **on-device** OCR (Google ML Kit / Apple Vision) — free and private — and
+`src/lib/certParser.ts` fills the stone fields.
+
+> **It needs a development build, not Expo Go** (on-device OCR is a native
+> module). In Expo Go the listing flow still works — the scan button just falls
+> back to manual entry. OCR activates automatically once you run a dev build
+> (see _Development build for OCR_ below).
+
+**Optional cloud alternative:** a `parse-certificate` Supabase edge function is
+also included for an LLM-based path (reads handwriting and PDFs, works in Expo
+Go) — deploy it and set `ANTHROPIC_API_KEY` (or `OCR_MODEL`) if you'd rather use
+that. It's not required for the on-device default.
 
 ## 6. Run it
 
@@ -88,6 +102,24 @@ npx expo start
 
 Scan the QR code with your iPhone camera to open in **Expo Go**, or press `i`
 for the iOS simulator.
+
+### Development build for OCR
+
+On-device certificate scanning needs a dev build (Expo Go can't load the native
+ML Kit module). Build one with EAS — no Mac required:
+
+```bash
+npm install -g eas-cli
+eas login
+eas build --profile development --platform ios
+```
+
+Install the resulting build on your iPhone, then run `npx expo start --dev-client`
+and open it there. Scanning will now autofill from the certificate photo.
+
+> iOS device installs require an Apple Developer account ($99/yr) for signing.
+> An **Android** dev build (`--platform android`) installs free if you have an
+> Android device to test on. Everything except OCR runs in plain Expo Go.
 
 ---
 
@@ -130,7 +162,9 @@ src/
     api.ts                   typed data access (queries + RPC calls)
     realtime.ts              postgres_changes subscriptions (feed, messages)
     storage.ts               upload media / read file as base64
-    ocr.ts                   parse-certificate invocation
+    captionParser.ts         free-text caption -> structured listing fields
+    certParser.ts            GIA/IGI OCR text -> stone fields
+    ocr.ts                   on-device text recognition (ML Kit / Vision)
     push.ts                  Expo push token registration
     types.ts, format.ts      domain types + formatting
   components/                Button, Field, ListingCard, etc.
@@ -167,7 +201,7 @@ claim."
 |------|-----------|-----------|
 | Auth | Phone mapped to internal email + password (no SMS needed) | Supabase phone **OTP** + **Google/Apple** via `signInWithIdToken` — swap the two calls in `src/lib/auth.tsx` |
 | Face ID | Unlocks a persisted session; auto-passes if no biometrics enrolled | Same, but only meaningful in a **dev/standalone build** (not Expo Go) |
-| OCR | Mock data if no key; vision model if `ANTHROPIC_API_KEY` set; PDFs use mock | Add a PDF→image step; tune the extraction prompt per lab |
+| OCR | On-device (ML Kit/Vision) + label parser; printed certs only, dev build only | Tune `certParser.ts` per lab; optional cloud LLM path for handwriting/PDFs |
 | Certificates | Public `listing-media` bucket | Private bucket + signed URLs |
 | Push | Client registers tokens; `notify-new-listing` ready to wire | Requires a **dev build** (remote push doesn't work in Expo Go SDK 53+) + a DB Webhook on `listings` INSERT → `notify-new-listing` |
 | Apple Shortcuts / action button | — | Add an App Intent / URL scheme (`jewelapp://listing/new`) in a dev build |

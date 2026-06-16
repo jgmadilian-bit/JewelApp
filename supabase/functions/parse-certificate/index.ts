@@ -10,6 +10,7 @@
 //
 // Deploy:  supabase functions deploy parse-certificate
 // Secrets: supabase secrets set ANTHROPIC_API_KEY=sk-ant-...   (optional)
+//          supabase secrets set OCR_MODEL=claude-haiku-4-5     (optional, cheaper)
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -17,7 +18,9 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const OCR_MODEL = Deno.env.get('OCR_MODEL') ?? 'claude-3-5-sonnet-latest';
+// Current vision-capable default. Override with the OCR_MODEL secret —
+// e.g. claude-haiku-4-5 for a cheaper/faster option.
+const OCR_MODEL = Deno.env.get('OCR_MODEL') ?? 'claude-opus-4-8';
 
 const EXTRACTION_PROMPT = `You are reading a gemstone grading certificate (GIA, IGI, GCAL, AGS, etc.).
 Extract these fields and respond with ONLY a single minified JSON object, no prose:

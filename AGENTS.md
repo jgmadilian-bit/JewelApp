@@ -38,6 +38,12 @@ differ from older SDKs. Specifics that bit us:
   `0002_functions.sql`. Helper predicates avoid policy recursion — reuse them.
 - Theme tokens live in `src/theme`. Dark + gold; mobile-first; reusable UI in
   `src/components/ui.tsx`.
+- Listings are **caption-first** and cover finished jewelry, not just loose
+  diamonds. `src/lib/captionParser.ts` turns a free-text post into structured
+  fields (metal, weight in dwt/grams, category, gemstones[], era, condition,
+  price terms, …) — it's the primary "OCR equivalent" and runs anywhere. The
+  raw caption is stored in `listings.description`; structured columns were added
+  in `0006_listing_fields.sql`. Cert OCR (`certParser.ts`) is secondary.
 
 ## Validate before finishing
 

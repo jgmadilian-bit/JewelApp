@@ -9,15 +9,18 @@ import { colors, font, radius, spacing } from '@/src/theme';
 export function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => void }) {
   const photo = listing.photos?.[0];
   const claimed = listing.status === 'claimed';
-  const specs = [
+  const weight =
+    listing.gross_weight != null ? `${listing.gross_weight}${listing.weight_unit ?? ''}` : null;
+  const stone = [
     listing.carat != null ? `${listing.carat}ct` : null,
     listing.shape,
     listing.color,
     listing.clarity,
-    listing.cut,
   ]
     .filter(Boolean)
-    .join('  ·  ');
+    .join(' ');
+  const size = listing.ring_size ? `sz ${listing.ring_size}` : listing.item_length || null;
+  const specs = [weight, stone || null, size].filter(Boolean).join('  ·  ');
 
   return (
     <Pressable
@@ -40,7 +43,7 @@ export function ListingCard({ listing, onPress }: { listing: Listing; onPress: (
       <View style={styles.body}>
         <View style={styles.titleRow}>
           <Text style={styles.title} numberOfLines={1}>
-            {listing.title || listing.stone_type || 'Stone'}
+            {listing.title || listing.category || listing.stone_type || 'Item'}
           </Text>
           <Text style={styles.price}>{formatPrice(listing.price, listing.currency)}</Text>
         </View>

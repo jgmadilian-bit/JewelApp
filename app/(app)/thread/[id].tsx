@@ -108,7 +108,7 @@ export default function ThreadScreen() {
           )}
           <View style={{ flex: 1 }}>
             <Text style={styles.pinnedTitle} numberOfLines={1}>
-              {listing.title ?? listing.stone_type ?? 'Stone'}
+              {listing.title ?? listing.category ?? listing.stone_type ?? 'Item'}
             </Text>
             <Text style={styles.pinnedPrice}>{formatPrice(listing.price, listing.currency)}</Text>
           </View>

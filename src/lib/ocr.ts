@@ -1,37 +1,53 @@
-import { supabase } from '@/src/lib/supabase';
+import { hasUsefulFields, parseCertificateText } from '@/src/lib/certParser';
 import type { ParsedCertificate } from '@/src/lib/types';
 
-/**
- * Sends a certificate image (base64) to the `parse-certificate` edge function,
- * which runs OCR + structured extraction and returns autofill-ready stone
- * details. The function gracefully returns mock data when no OCR provider key
- * is configured, so the listing flow always works end-to-end.
- */
-export async function parseCertificate(
-  fileBase64: string,
-  mimeType: string,
-): Promise<ParsedCertificate> {
-  const { data, error } = await supabase.functions.invoke<ParsedCertificate>(
-    'parse-certificate',
-    { body: { fileBase64, mimeType } },
-  );
-
-  if (error) {
-    throw new Error(error.message ?? 'Certificate parsing failed');
+/** Thrown when on-device OCR isn't available (e.g. running in Expo Go). */
+export class OcrUnavailableError extends Error {
+  constructor() {
+    super('On-device OCR is unavailable in this build.');
+    this.name = 'OcrUnavailableError';
   }
-  if (!data) {
-    throw new Error('Certificate parsing returned no data');
-  }
-  return data;
 }
 
-/** Builds a human listing title from parsed stone details, e.g. "1.52ct Round D VS1". */
-export function titleFromStone(p: Partial<ParsedCertificate>): string {
-  const parts: string[] = [];
-  if (p.carat != null) parts.push(`${p.carat}ct`);
-  if (p.shape) parts.push(p.shape);
-  if (p.stone_type && p.stone_type.toLowerCase() !== 'diamond') parts.push(p.stone_type);
-  if (p.color) parts.push(p.color);
-  if (p.clarity) parts.push(p.clarity);
-  return parts.join(' ').trim();
+// Lazily load the native module so importing this file never crashes in Expo
+// Go (where the native side isn't present). Returns null if it can't load.
+function loadTextRecognition(): { recognize: (uri: string) => Promise<unknown> } | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require('@react-native-ml-kit/text-recognition');
+    const impl = mod?.default ?? mod;
+    return impl && typeof impl.recognize === 'function' ? impl : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface OcrResult {
+  parsed: ParsedCertificate;
+  rawText: string;
+  /** False when OCR ran but couldn't extract any usable stone fields. */
+  useful: boolean;
+}
+
+/**
+ * Runs on-device text recognition on a local image URI and parses the result
+ * into stone fields. Throws OcrUnavailableError if the native module isn't
+ * available or the scan fails — callers fall back to manual entry.
+ */
+export async function recognizeAndParseCertificate(uri: string): Promise<OcrResult> {
+  const TextRecognition = loadTextRecognition();
+  if (!TextRecognition) throw new OcrUnavailableError();
+
+  let rawText = '';
+  try {
+    const result = (await TextRecognition.recognize(uri)) as { text?: string } | string;
+    rawText = typeof result === 'string' ? result : (result?.text ?? '');
+  } catch {
+    // Native module present in JS but not wired up (e.g. Expo Go) -> treat as
+    // unavailable so the UI shows the right hint.
+    throw new OcrUnavailableError();
+  }
+
+  const parsed = parseCertificateText(rawText);
+  return { parsed, rawText, useful: hasUsefulFields(parsed) };
 }

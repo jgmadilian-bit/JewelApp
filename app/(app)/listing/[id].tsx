@@ -123,15 +123,24 @@ export default function ListingDetail() {
   const isSeller = listing.seller_id === userId;
   const isClaimer = listing.claimed_by === userId;
   const available = listing.status === 'available';
+  const weightValue =
+    listing.gross_weight != null ? `${listing.gross_weight} ${listing.weight_unit ?? ''}`.trim() : null;
   const specs: { label: string; value: string | null }[] = [
+    { label: 'Type', value: listing.category },
+    { label: 'Metal', value: listing.metal },
+    { label: 'Weight', value: weightValue },
+    { label: 'Era / style', value: listing.era },
+    { label: 'Ring size', value: listing.ring_size },
+    { label: 'Length', value: listing.item_length },
     { label: 'Carat', value: listing.carat != null ? `${listing.carat}` : null },
+    { label: 'Total ctw', value: listing.total_carat != null ? `${listing.total_carat}` : null },
     { label: 'Shape', value: listing.shape },
     { label: 'Color', value: listing.color },
     { label: 'Clarity', value: listing.clarity },
     { label: 'Cut', value: listing.cut },
     { label: 'Lab', value: listing.lab },
-    { label: 'Measurements', value: listing.measurements },
     { label: 'Cert #', value: listing.cert_number },
+    { label: 'Measurements', value: listing.measurements },
   ];
 
   return (
@@ -155,13 +164,29 @@ export default function ListingDetail() {
         <View style={styles.body}>
           <View style={styles.headRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.title}>{listing.title ?? listing.stone_type ?? 'Stone'}</Text>
+              <Text style={styles.title}>
+                {listing.title ?? listing.category ?? listing.stone_type ?? 'Item'}
+              </Text>
               <Text style={styles.time}>Posted {timeAgo(listing.created_at)}</Text>
             </View>
             {available ? <Pill text="Live" tone="green" /> : <Pill text="Sold" tone="red" />}
           </View>
 
-          <Text style={styles.price}>{formatPrice(listing.price, listing.currency)}</Text>
+          <View>
+            <Text style={styles.price}>{formatPrice(listing.price, listing.currency)}</Text>
+            {listing.price_terms ? <Text style={styles.terms}>{listing.price_terms}</Text> : null}
+          </View>
+
+          {listing.description ? (
+            <Text style={styles.description}>{listing.description}</Text>
+          ) : null}
+
+          {listing.condition ? (
+            <View style={styles.conditionRow}>
+              <Text style={styles.conditionLabel}>Condition</Text>
+              <Text style={styles.conditionText}>{listing.condition}</Text>
+            </View>
+          ) : null}
 
           {/* Specs grid */}
           <View style={styles.specGrid}>
@@ -174,6 +199,31 @@ export default function ListingDetail() {
                 </View>
               ))}
           </View>
+
+          {listing.gemstones && listing.gemstones.length > 0 ? (
+            <View style={{ gap: spacing(2) }}>
+              <Text style={styles.specLabel}>Stones</Text>
+              <View style={styles.gemWrap}>
+                {listing.gemstones.map((g, i) => (
+                  <View key={i} style={styles.gemChip}>
+                    <Text style={styles.gemChipText}>
+                      {[
+                        g.carat != null
+                          ? `${g.each ? '~' : ''}${g.carat}${g.ctw ? 'ctw' : 'ct'}${g.each ? ' ea' : ''}`
+                          : null,
+                        g.shape,
+                        g.type,
+                        g.color,
+                        g.clarity,
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
 
           {listing.certificate_url ? (
             <Pressable
@@ -237,6 +287,28 @@ const styles = StyleSheet.create({
   title: { ...font.h1, color: colors.text },
   time: { ...font.small, color: colors.textFaint, marginTop: spacing(1) },
   price: { ...font.h1, color: colors.goldSoft },
+  terms: { ...font.small, color: colors.textMuted, marginTop: spacing(1) },
+  description: {
+    ...font.body,
+    color: colors.text,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing(4),
+    lineHeight: 22,
+  },
+  conditionRow: { gap: spacing(1) },
+  conditionLabel: { ...font.micro, color: colors.red, textTransform: 'uppercase' },
+  conditionText: { ...font.body, color: colors.text },
+  gemWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2) },
+  gemChip: {
+    backgroundColor: colors.surfaceHi,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1.5),
+  },
+  gemChipText: { ...font.small, color: colors.text },
 
   specGrid: {
     flexDirection: 'row',

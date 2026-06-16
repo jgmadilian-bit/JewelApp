@@ -71,7 +71,7 @@ export default function DealsScreen() {
             )}
             <View style={{ flex: 1, gap: spacing(1) }}>
               <Text style={styles.title} numberOfLines={1}>
-                {l?.title ?? l?.stone_type ?? 'Stone'}
+                {l?.title ?? l?.category ?? l?.stone_type ?? 'Item'}
               </Text>
               <Text style={styles.price}>{formatPrice(l?.price, l?.currency ?? 'USD')}</Text>
               <View style={styles.metaRow}>

@@ -116,6 +116,18 @@ export interface NewListingInput {
   currency: string;
   photos: string[];
   certificate_url: string | null;
+  description: string | null;
+  category: string | null;
+  metal: string | null;
+  gross_weight: number | null;
+  weight_unit: string | null;
+  ring_size: string | null;
+  item_length: string | null;
+  condition: string | null;
+  era: string | null;
+  total_carat: number | null;
+  price_terms: string | null;
+  gemstones: import('@/src/lib/types').Gemstone[] | null;
   stone_type: string | null;
   shape: string | null;
   carat: number | null;
